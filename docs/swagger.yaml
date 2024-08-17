@@ -1,0 +1,760 @@
+openapi: 3.0.0
+info:
+  title: Toko Online API
+  description: API untuk mengelola toko online termasuk autentikasi, produk, pesanan, dan keranjang belanja.
+  version: 1.0.0
+  contact:
+    name: Dukungan Toko Online
+    email: abdurrohmanhaadziq@gmail.com
+    url: https://haadziq.my.id
+  license:
+    name: MIT License
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://haadziq.my.id
+
+servers:
+  - url: https://api.haadziq.my.id/v1
+    description: Server utama untuk API Toko Online
+  - url: http://localhost:3000/api
+    description: Server pengembangan lokal
+
+paths:
+  /users/register:
+    post:
+      summary: Daftar pengguna baru
+      description: Mendaftar pengguna baru ke toko online.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "johndoe"
+                password:
+                  type: string
+                  example: "securepassword123"
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Pengguna berhasil terdaftar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Pengguna berhasil terdaftar"
+        '400':
+          description: Permintaan tidak valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Username atau password tidak valid"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /users/login:
+    post:
+      summary: Login pengguna
+      description: Mengautentikasi pengguna dan mengembalikan token sesi serta cookie.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "johndoe"
+                password:
+                  type: string
+                  example: "securepassword123"
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Sukses login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+                  message:
+                    type: string
+                    example: "Login berhasil"
+        '401':
+          description: Kredensial salah
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Username atau password salah"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /products/admin/insert-product:
+    post:
+      summary: Tambah produk baru
+      description: Menambahkan produk baru ke toko online.
+      tags:
+        - Products
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Produk A"
+                description:
+                  type: string
+                  example: "Deskripsi produk A"
+                price:
+                  type: integer
+                  example: 10000
+                stock:
+                  type: integer
+                  example: 50
+              required:
+                - name
+                - price
+                - stock
+      responses:
+        '200':
+          description: Produk berhasil ditambahkan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "prod12345"
+                  name:
+                    type: string
+                    example: "Produk A"
+                  description:
+                    type: string
+                    example: "Deskripsi produk A"
+                  price:
+                    type: integer
+                    example: 10000
+                  stock:
+                    type: integer
+                    example: 50
+        '403':
+          description: Tidak diizinkan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tidak diizinkan untuk menambah produk"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /products/user/find-by-id/{id}:
+    get:
+      summary: Ambil informasi produk berdasarkan ID
+      description: Mengambil informasi produk berdasarkan ID.
+      tags:
+        - Products
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          example: "prod12345"
+      responses:
+        '200':
+          description: Informasi produk
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "prod12345"
+                  name:
+                    type: string
+                    example: "Produk A"
+                  description:
+                    type: string
+                    example: "Deskripsi produk A"
+                  price:
+                    type: integer
+                    example: 10000
+                  stock:
+                    type: integer
+                    example: 50
+        '404':
+          description: Produk tidak ditemukan
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /products/user/find-all:
+    get:
+      summary: Daftar semua produk
+      description: Mengambil daftar semua produk yang tersedia.
+      tags:
+        - Products
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Daftar produk
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "prod12345"
+                    name:
+                      type: string
+                      example: "Produk A"
+                    description:
+                      type: string
+                      example: "Deskripsi produk A"
+                    price:
+                      type: integer
+                      example: 10000
+                    stock:
+                      type: integer
+                      example: 50
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /products/admin/update-product/{id}:
+    put:
+      summary: Update produk
+      description: Memperbarui informasi produk berdasarkan ID.
+      tags:
+        - Products
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          example: "prod12345"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Produk A Updated"
+                description:
+                  type: string
+                  example: "Deskripsi produk A yang diperbarui"
+                price:
+                  type: integer
+                  example: 12000
+                stock:
+                  type: integer
+                  example: 40
+      responses:
+        '200':
+          description: Produk berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "prod12345"
+                  name:
+                    type: string
+                    example: "Produk A Updated"
+                  description:
+                    type: string
+                    example: "Deskripsi produk A yang diperbarui"
+                  price:
+                    type: integer
+                    example: 12000
+                  stock:
+                    type: integer
+                    example: 40
+        '404':
+          description: Produk tidak ditemukan
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /products/admin/delete-product/{id}:
+    delete:
+      summary: Hapus produk
+      description: Menghapus produk berdasarkan ID.
+      tags:
+        - Products
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          example: "prod12345"
+      responses:
+        '200':
+          description: Produk berhasil dihapus
+        '404':
+          description: Produk tidak ditemukan
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+    /orders/user/create-order:
+    post:
+      summary: Buat pesanan baru
+      description: Membuat pesanan baru untuk pengguna.
+      tags:
+        - Orders
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "user12345"
+                productId:
+                  type: string
+                  example: "prod12345"
+                quantity:
+                  type: integer
+                  example: 1
+              required:
+                - userId
+                - productId
+                - quantity
+      responses:
+        '200':
+          description: Pesanan berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "order12345"
+                  userId:
+                    type: string
+                    example: "user12345"
+                  productId:
+                    type: string
+                    example: "prod12345"
+                  quantity:
+                    type: integer
+                    example: 1
+                  totalPrice:
+                    type: integer
+                    example: 10000
+                  status:
+                    type: string
+                    example: "pending"
+        '400':
+          description: Permintaan tidak valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Data pesanan tidak valid"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /orders/user/view-order-all:
+    get:
+      summary: Daftar semua pesanan
+      description: Mengambil daftar semua pesanan pengguna.
+      tags:
+        - Orders
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Daftar pesanan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "order12345"
+                    userId:
+                      type: string
+                      example: "user12345"
+                    productId:
+                      type: string
+                      example: "prod12345"
+                    quantity:
+                      type: integer
+                      example: 1
+                    totalPrice:
+                      type: integer
+                      example: 10000
+                    status:
+                      type: string
+                      example: "pending"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /orders/user/delete-order/{id}:
+    delete:
+      summary: Hapus pesanan
+      description: Menghapus pesanan berdasarkan ID.
+      tags:
+        - Orders
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          example: "order12345"
+      responses:
+        '200':
+          description: Pesanan berhasil dihapus
+        '404':
+          description: Pesanan tidak ditemukan
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /orders/user/cancel-order/{id}:
+    delete:
+      summary: Batalkan pesanan
+      description: Membatalkan pesanan berdasarkan ID.
+      tags:
+        - Orders
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          example: "order12345"
+      responses:
+        '200':
+          description: Pesanan berhasil dibatalkan
+        '404':
+          description: Pesanan tidak ditemukan
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+  /carts/user/insert-item-to-cart:
+    post:
+      summary: Tambah item ke keranjang
+      description: Menambahkan item ke keranjang belanja pengguna.
+      tags:
+        - Carts
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "user12345"
+                productId:
+                  type: string
+                  example: "prod12345"
+                quantity:
+                  type: integer
+                  example: 1
+              required:
+                - userId
+                - productId
+                - quantity
+      responses:
+        '200':
+          description: Item berhasil ditambahkan ke keranjang
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "cart12345"
+                  userId:
+                    type: string
+                    example: "user12345"
+                  productId:
+                    type: string
+                    example: "prod12345"
+                  quantity:
+                    type: integer
+                    example: 1
+        '400':
+          description: Permintaan tidak valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Data keranjang tidak valid"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /carts/user/view-cart:
+    get:
+      summary: Lihat keranjang belanja
+      description: Mengambil daftar item di keranjang belanja pengguna.
+      tags:
+        - Carts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Daftar item di keranjang
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "cart12345"
+                    userId:
+                      type: string
+                      example: "user12345"
+                    productId:
+                      type: string
+                      example: "prod12345"
+                    quantity:
+                      type: integer
+                      example: 1
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+  /carts/user/checkout-cart:
+    post:
+      summary: Checkout dari keranjang
+      description: Mencheckout item dari keranjang belanja.
+      tags:
+        - Carts
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "user12345"
+                cartId:
+                  type: string
+                  example: "cart12345"
+              required:
+                - userId
+                - cartId
+      responses:
+        '200':
+          description: Checkout berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    example: "order12345"
+                  message:
+                    type: string
+                    example: "Checkout berhasil, pesanan telah dibuat."
+        '400':
+          description: Permintaan tidak valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Data checkout tidak valid"
+        '500':
+          description: Kesalahan internal server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Terjadi kesalahan di server"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: http
+      scheme: cookie
