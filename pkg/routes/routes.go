@@ -30,6 +30,7 @@ func NewRoutesOrder(router fiber.Router, ordercontroller *controllers.OrderContr
 	app.Get("/user/view-order-all", ordercontroller.ViewOrderAll)
 	app.Delete("/user/delete-order/:id", ordercontroller.DeleteOrder)
 	app.Delete("/user/cancel-order/:id", ordercontroller.CancelOrder)
+	app.Post("/user/cekOngkir", ordercontroller.CekOngkir)
 }
 
 func NewRoutesCarts(router fiber.Router, cartscontroller *controllers.CartsController){
