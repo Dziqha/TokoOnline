@@ -12,6 +12,7 @@ Ini adalah proyek API untuk Toko Online yang dibangun menggunakan bahasa Go (Gol
 - **Otentikasi Pengguna:** Sistem login dan registrasi pengguna menggunakan JWT (JSON Web Token).
 - **Manajemen Pesanan:** Membuat, melihat, dan mengelola pesanan yang dilakukan oleh pengguna.
 - **Keranjang Belanja:** Fitur untuk menambahkan dan mengelola produk dalam keranjang belanja sebelum melakukan checkout.
+- **CheckOngkir:** Mengecheck ongkir dari kurir JNE POS dan TIKI
 
 
 ## 🛠️ Teknologi yang Digunakan
@@ -33,8 +34,8 @@ Ini adalah proyek API untuk Toko Online yang dibangun menggunakan bahasa Go (Gol
     ├── controllers/    # Logika untuk handling request
     ├── middleware/     # Middleware untuk otentikasi, logging, dll.
     ├── models/         # Struktur data dan interaksi database
-    ├── response-code/ 
-    ├── responses/ 
+    ├── response-code/  # Response code
+    ├── responses/      # Response
     ├── routes/         # Definisi rute API
     ├── utils/          # Fungsi utilitas yang digunakan di seluruh proyek
 ├── tests/              # Test endpoint menggunakan K6
