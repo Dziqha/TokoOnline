@@ -6,9 +6,14 @@ import (
 	"Clone-TokoOnline/pkg/response-codes"
 	"Clone-TokoOnline/pkg/responses"
 	"Clone-TokoOnline/pkg/utils"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -291,6 +296,10 @@ func (controller *OrderController) CancelOrder(c *fiber.Ctx) error {
 		return utils.ErrorInternalServerError(c,err)
 	}
 
+	if err := configs.Database().Where("id = ?", id).Delete(&order).Error; err != nil {
+		return utils.ErrorInternalServerError(c,err)
+	}
+
 	err := configs.CancelQueue(id)
 	if err != nil {
 		return utils.ErrorInternalServerError(c,err)
@@ -300,4 +309,158 @@ func (controller *OrderController) CancelOrder(c *fiber.Ctx) error {
 		Status: fiber.StatusOK,
 		Message: "Order successfully canceled",
 	})
+}
+
+func (controller *OrderController) CekOngkir(c *fiber.Ctx) error {
+    var request struct {
+        Origin      string `json:"origin"`
+        Destination string `json:"destination"`
+        Weight      int    `json:"weight"`
+    }
+
+    if err := c.BodyParser(&request); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "status":  fiber.StatusBadRequest,
+            "message": "Invalid request body",
+        })
+    }
+
+    getCityID := func(cityName string) (int, error) {
+        url := "https://api.rajaongkir.com/starter/city?key=637db82739e1241882f2c3ba7d3a1ea6" // Ganti dengan kunci API Anda
+        resp, err := http.Get(url)
+        if err != nil {
+            return 0, err
+        }
+        defer resp.Body.Close()
+
+        var result struct {
+            RajaOngkir struct {
+                Results []struct {
+                    CityID   string `json:"city_id"`
+                    CityName string `json:"city_name"`
+                } `json:"results"`
+            } `json:"rajaongkir"`
+        }
+
+        if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+            return 0, err
+        }
+
+        for _, city := range result.RajaOngkir.Results {
+            if strings.EqualFold(city.CityName, cityName) {
+                id, err := strconv.Atoi(city.CityID)
+                if err != nil {
+                    return 0, err
+                }
+                return id, nil
+            }
+        }
+
+        return 0, fmt.Errorf("city not found")
+    }
+
+    originID, err := getCityID(request.Origin)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "status":  fiber.StatusBadRequest,
+            "message": "Invalid origin city",
+        })
+    }
+
+    destinationID, err := getCityID(request.Destination)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "status":  fiber.StatusBadRequest,
+            "message": "Invalid destination city",
+        })
+    }
+
+    couriers := []string{"jne", "pos", "tiki"}
+    var allCosts []fiber.Map
+
+    for _, courier := range couriers {
+        payload := map[string]string{
+            "origin":      strconv.Itoa(originID),
+            "destination": strconv.Itoa(destinationID),
+            "weight":      strconv.Itoa(request.Weight),
+            "courier":     courier,
+        }
+
+        jsonPayload, err := json.Marshal(payload)
+        if err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "status":  fiber.StatusInternalServerError,
+                "message": "Failed to marshal request payload",
+            })
+        }
+
+        url := "https://api.rajaongkir.com/starter/cost"
+        req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+        if err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "status":  fiber.StatusInternalServerError,
+                "message": "Failed to create HTTP request",
+            })
+        }
+
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("key", "637db82739e1241882f2c3ba7d3a1ea6") // Ganti dengan kunci API Anda
+
+        client := &http.Client{}
+        resp, err := client.Do(req)
+        if err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "status":  fiber.StatusInternalServerError,
+                "message": "Failed to make API request",
+            })
+        }
+        defer resp.Body.Close()
+
+        var apiResponse struct {
+            RajaOngkir struct {
+                Results []struct {
+                    Code  string `json:"code"`
+                    Costs []struct {
+                        Service     string `json:"service"`
+                        Description string `json:"description"`
+                        Cost        []struct {
+                            Value int    `json:"value"`
+                            Etd   string `json:"etd"`
+                        } `json:"cost"`
+                    } `json:"costs"`
+                } `json:"results"`
+            } `json:"rajaongkir"`
+        }
+
+        if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                "status":  fiber.StatusInternalServerError,
+                "message": "Failed to decode API response",
+            })
+        }
+
+        for _, result := range apiResponse.RajaOngkir.Results {
+            for _, cost := range result.Costs {
+                for _, detail := range cost.Cost {
+                    allCosts = append(allCosts, fiber.Map{
+                        "courier":     result.Code,
+                        "service":     cost.Service,
+                        "description": cost.Description,
+                        "value":       detail.Value,
+                        "etd":         detail.Etd,
+                    })
+                }
+            }
+        }
+    }
+
+    return c.Status(fiber.StatusOK).JSON(fiber.Map{
+        "status":  fiber.StatusOK,
+        "message": "Success",
+        "data": fiber.Map{
+            "origin_city":      request.Origin,
+            "destination_city": request.Destination,
+            "costs":            allCosts,
+        },
+    })
 }
