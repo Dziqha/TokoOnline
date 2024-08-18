@@ -8,6 +8,7 @@ import (
 	"Clone-TokoOnline/pkg/utils"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -380,7 +381,6 @@ func (controller *ProductController) DeleteProduct(c *fiber.Ctx) error {
 	})
 }
 
-
 func (controller *ProductController) SearchProduct(c *fiber.Ctx) error {
 	var requestBody map[string]string
 	if err := c.BodyParser(&requestBody); err != nil {
@@ -398,9 +398,24 @@ func (controller *ProductController) SearchProduct(c *fiber.Ctx) error {
 		})
 	}
 
+	searchBody := fmt.Sprintf(`{
+		"suggest": {
+			"product-suggest": {
+				"prefix": "%s",
+				"completion": {
+					"field": "suggest",
+					"fuzzy": {
+						"fuzziness": 2
+					}
+				}
+			}
+		},
+		"_source": ["name", "description", "price", "stock", "suggest"]
+	}`, query)
+
 	resp, err := esapi.SearchRequest{
 		Index: []string{configs.SearchIndex},
-		Body:  strings.NewReader(`{"query": {"match": {"name": "` + query + `"}}}`),
+		Body:  strings.NewReader(searchBody),
 	}.Do(context.Background(), configs.ESClient)
 
 	if err != nil {
@@ -410,7 +425,6 @@ func (controller *ProductController) SearchProduct(c *fiber.Ctx) error {
 			"message": "Failed to search product",
 		})
 	}
-
 	defer resp.Body.Close()
 
 	var esResponse map[string]interface{}
@@ -418,41 +432,103 @@ func (controller *ProductController) SearchProduct(c *fiber.Ctx) error {
 		log.Printf("Error decoding search response: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  fiber.StatusInternalServerError,
-			"message": "Failed to search product",
+			"message": "Failed to decode search response",
 		})
 	}
-	hits := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
-	totalResults := int(esResponse["hits"].(map[string]interface{})["total"].(map[string]interface{})["value"].(float64))
+
+	// Extract suggestions
+	suggests, ok := esResponse["suggest"].(map[string]interface{})
+	if !ok {
+		log.Printf("Unexpected format of Elasticsearch response: %v", esResponse)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  fiber.StatusInternalServerError,
+			"message": "Unexpected format of Elasticsearch response",
+		})
+	}
+
+	productSuggests, ok := suggests["product-suggest"].([]interface{})
+	if !ok {
+		log.Printf("Unexpected format of Elasticsearch suggest response: %v", suggests)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  fiber.StatusInternalServerError,
+			"message": "Unexpected format of Elasticsearch suggest response",
+		})
+	}
 
 	var products []responses.Product
-	for _, hit := range hits {
-		source := hit.(map[string]interface{})["_source"].(map[string]interface{})
-		product := responses.Product{
-			Id:          hit.(map[string]interface{})["_id"].(string),
-			Name:        source["name"].(string),
-			Description: source["description"].(string),
+	for _, item := range productSuggests {
+		suggestion, ok := item.(map[string]interface{})
+		if !ok {
+			log.Printf("Unexpected item format: %v", item)
+			continue
 		}
-		if price, ok := source["price"].(float64); ok {
-			product.Price = int(price)
+		options, ok := suggestion["options"].([]interface{})
+		if !ok {
+			log.Printf("Unexpected options format: %v", suggestion)
+			continue
 		}
-		if stock, ok := source["stock"].(float64); ok {
-			product.Stock = int(stock)
+		for _, opt := range options {
+			option, ok := opt.(map[string]interface{})
+			if !ok {
+				log.Printf("Unexpected option format: %v", opt)
+				continue
+			}
+			source, ok := option["_source"].(map[string]interface{})
+			if !ok {
+				log.Printf("Unexpected source format: %v", option)
+				continue
+			}
+
+			id, idOk := option["_id"].(string)
+			if !idOk {
+				log.Printf("Unexpected ID format: %v", option["_id"])
+				continue
+			}
+
+			// Handle `suggest` data if other fields are missing
+			var name, description string
+			if suggestField, found := source["suggest"].(map[string]interface{}); found {
+				if inputs, found := suggestField["input"].([]interface{}); found && len(inputs) > 0 {
+					name = inputs[0].(string)
+					description = name // Fallback if description is missing
+				}
+			}
+
+			if n, found := source["name"].(string); found {
+				name = n
+			}
+			if d, found := source["description"].(string); found {
+				description = d
+			}
+
+			product := responses.Product{
+				Id:          id,
+				Name:        name,
+				Description: description,
+			}
+
+			if price, priceOk := source["price"].(float64); priceOk {
+				product.Price = int(price)
+			}
+			if stock, stockOk := source["stock"].(float64); stockOk {
+				product.Stock = int(stock)
+			}
+
+			products = append(products, product)
 		}
-		products = append(products, product)
 	}
 
 	result := models.SearchResult{
 		Status:  fiber.StatusOK,
 		Message: "Product search result",
 		Data: struct {
-			TotalResults int        `json:"total_results"`
+			TotalResults int                 `json:"total_results"`
 			Hits         []responses.Product `json:"hits"`
 		}{
-			TotalResults: totalResults,
+			TotalResults: len(products),
 			Hits:         products,
 		},
 	}
 
 	return c.JSON(result)
 }
-
