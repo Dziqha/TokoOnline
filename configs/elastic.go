@@ -37,8 +37,18 @@ func ESCreateIndexIfNotExist() {
 
 	if exists.StatusCode == 404 {
 		// Jika indeks tidak ada, buat indeks
+		mapping := `{
+			"mappings": {
+				"properties": {
+					"suggest": {
+						"type": "completion"
+					}
+				}
+			}
+		}`
 		req := esapi.IndicesCreateRequest{
 			Index: SearchIndex,
+			Body:  strings.NewReader(mapping),
 		}
 
 		res, err := req.Do(context.Background(), ESClient)
@@ -59,34 +69,36 @@ func ESCreateIndexIfNotExist() {
 	}
 }
 
-
 func AddProductToIndex(product models.Product) error {
-	productJson, err := json.Marshal(product)
+	suggest := map[string]interface{}{
+		"suggest": map[string]interface{}{
+			"input": []string{product.Name},
+		},
+	}
+	productJson, err := json.Marshal(suggest)
 	if err != nil {
-		log.Fatalf("Error marshalling product: %s", err)
+		return fmt.Errorf("error marshalling product: %s", err)
 	}
 
 	req := esapi.IndexRequest{
-		Index: SearchIndex,
-		Body:  bytes.NewReader(productJson),
-		Refresh: "true",
+		Index:      SearchIndex,
+		Body:       bytes.NewReader(productJson),
+		Refresh:    "true",
 		DocumentID: product.ID,
 	}
 
-	res, err := req.Do(context.Background(),ESClient)
+	res, err := req.Do(context.Background(), ESClient)
 	if err != nil {
-		log.Fatalf("Error indexing product: %s", err)
+		return fmt.Errorf("error indexing product: %s", err)
 	}
 	defer res.Body.Close()
 
-	if res.IsError(){
-		log.Fatalf("Error response from Elasticsearch: %s", res.String())
+	if res.IsError() {
+		return fmt.Errorf("error response from Elasticsearch: %s", res.String())
 	}
-
 
 	return nil
 }
-
 func UpdatedProductToIndex( esClient *elasticsearch.Client,productID string, updateData responses.Product) error {
 	productJson, err := json.Marshal(updateData)
 	if err != nil {
